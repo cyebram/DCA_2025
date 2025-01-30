@@ -1,0 +1,57 @@
+---
+title: "1. Datos, Modelos y Software. Ejercicios"
+date: "Enero 2025"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 1
+    theme: cerulean
+---
+
+
+<style>
+body {
+text-align: justify}
+</style>
+
+<style type="text/css">
+body{/*Normal*/
+     font-size: 20px;
+}
+</style>
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(tidyverse)
+library(discrtr) # A companion package for the book Introduction to Discrete Choice Analysis with `R`
+library(mlogit) # Multinomial Logit Models
+library(readr) # Read Rectangular Text Data
+```
+
+
+
+Invoke data set Mode from package mlogit. To do this you need to first load the package. This is a data set with choices about mode of transportation. This is done as follows:
+
+```{r}
+data("Mode")
+```
+
+Once you have loaded the data set, answer the following questions:
+Describe this data set. How many variables are there and of which type (i.e., categorical/quantitative)?
+
+
+How many different modes of transportation are in this data set? What is the most popular mode? What is the least popular mode?
+
+In general, what is the most expensive mode? The least expensive?
+
+Create a plot showing the univariate distributions of time by car and time by bus. Discuss.
+
+How do choices relate to cost by the different modes?
+
+
+
+
+
