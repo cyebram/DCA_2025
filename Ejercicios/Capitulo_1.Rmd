@@ -29,6 +29,7 @@ library(tidyverse)
 library(discrtr) # A companion package for the book Introduction to Discrete Choice Analysis with `R`
 library(mlogit) # Multinomial Logit Models
 library(readr) # Read Rectangular Text Data
+library(plotly)
 ```
 
 
@@ -42,14 +43,82 @@ data("Mode")
 Once you have loaded the data set, answer the following questions:
 Describe this data set. How many variables are there and of which type (i.e., categorical/quantitative)?
 
+```{r}
+glimpse(Mode)
+```
+
+
+
+
 
 How many different modes of transportation are in this data set? What is the most popular mode? What is the least popular mode?
 
+```{r}
+summary(Mode)
+```
+```{r}
+ggplot(Mode)+
+  geom_bar(aes(choice, fill=choice), color="black", show.legend = FALSE)+
+  theme_bw()
+```
+
+
 In general, what is the most expensive mode? The least expensive?
+
+
+```{r}
+ggplot(Mode)+
+  geom_density(aes(cost.car, fill="car"), color="black", alpha=0.5)+
+  geom_density(aes(cost.carpool , fill="carpool"), color="black", alpha=0.5)+
+  geom_density(aes(cost.bus, fill="bus"), color="black", alpha=0.5)+
+  geom_density(aes(cost.rail, fill="rail"), color="black", alpha=0.5)+
+  scale_fill_manual(values=c("car"= "firebrick", "carpool"="dodgerblue", "bus"="darkgoldenrod2", "rail"="cyan"), name="Mode")+
+  xlab("Cost")+
+theme_bw()
+  
+```
+
+
 
 Create a plot showing the univariate distributions of time by car and time by bus. Discuss.
 
+
+```{r}
+grafica_time <- ggplot(Mode)+
+  geom_density(aes(time.car, fill="car"), color="black", alpha=0.5)+
+  geom_density(aes(time.carpool , fill="carpool"), color="black", alpha=0.5)+
+  geom_density(aes(time.bus, fill="bus"), color="black", alpha=0.5)+
+  geom_density(aes(time.rail, fill="rail"), color="black", alpha=0.5)+
+  scale_fill_manual(values=c("car"= "firebrick", "carpool"="dodgerblue", "bus"="darkgoldenrod2", "rail"="cyan"), name="Mode")+
+  xlab("Time")+
+theme_bw()
+
+
+ggplotly(grafica_time)  
+```
+
 How do choices relate to cost by the different modes?
+
+```{r}
+varnum <- Mode |> dplyr::select(where(is.numeric))
+varnum <- names(varnum)
+
+for (var in varnum) {
+grafica_box <- ggplot(Mode)+
+  geom_boxplot(aes(choice, eval(as.name(var)), fill=choice), show.legend=FALSE)+
+  ylab(var)+
+  theme_bw()
+  
+  print(grafica_box)
+    
+}
+
+
+
+```
+
+
+
 
 
 
