@@ -58,7 +58,7 @@ glimpse(Car)
 
 
 
-En este caso es necesario añadir columnas acerca de la elección:
+En este caso es necesario añadir columnas acerca de la elección, las gráficas se realizarán con la data frame `new_car`:
 
 
 ```{r}

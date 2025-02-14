@@ -30,8 +30,6 @@ library(discrtr) # A companion package for the book Introduction to Discrete Cho
 library(mlogit) # Multinomial Logit Models
 library(readr) # Read Rectangular Text Data
 
-
-
 library(gplots) # Various R Programming Tools for Plotting Data
 library(ggmosaic) # Mosaic Plots in the 'ggplot2' Framework
 library(treemapify)
@@ -41,37 +39,158 @@ library(plotly)
 ```
 
 
-
+Cargamos el conjunto de datos
 
 ```{r}
 data("mc_commute_wide")
 glimpse(mc_commute_wide)
 ```
+
+Se modifican un par de variables para que los niveles (levels)  sean más específicos.
+
+```{r}
+mc_commute_wide <- mc_commute_wide |> mutate(child = factor(child, levels=c("Yes", "No"),
+                                                            labels=c("Living with a child", "Not living with a child")),
+                                             vehind = factor(vehind, levels=c("No", "Yes"),
+                                                             labels=c("No ind. vehicle access", "Ind. vehicle access")))
+```
+
+
+La variable `available.Walk` es de clase caracter, es necesario cambiarla a factor (variable cualitativa).
+
+```{r}
+
+mc_commute_wide$available.Walk <- factor(mc_commute_wide$available.Walk)
+
+#summary(mc_commute_wide)
+```
+
+
+Gráfica de barras de la variable `shelter_good_quality`
+
 ```{r}
 ggplot(mc_commute_wide)+
-  geom_bar(aes(shelter_good_quality, fill=gender), color="black")+
+  geom_bar(aes(shelter_good_quality, fill=shelter_good_quality), color="black", show.legend = FALSE)+
+  labs(x = "Public transport facilities of good quality", y = "Number of respondents")+
   theme_bw()
 ```
+
+*Lollipop plot* 
+
+```{r}
+mc_commute_wide |> group_by(shelter_good_quality) |> summarize(n = n())|> 
+  ggplot() +
+  geom_point(aes(shelter_good_quality,n), color = "black", fill = "white", size = 6)+ 
+  geom_segment(aes(x=shelter_good_quality, y=0, xend = shelter_good_quality, yend = n), linewidth = 1, show.legend = FALSE) +
+  labs(x = "Public transport facilities of good quality", y = "Number of respondents")+
+  theme_bw()
+```
+
+*Treemap* de `choice`
 
 
 ```{r}
 mc_commute_wide |> group_by(choice) |> summarize(n = n()) |> 
-ggplot(aes(fill = choice, area = n)) +
-  geom_treemap() +
+ggplot() +
+  geom_treemap(aes(fill = choice, area = n)) +
   labs(title = "Trips by mode", fill="Mode")
 ```
 
 
+Se definen nuevos niveles de la variable `housing`
+
 
 
 ```{r}
-ggplot(mc_commute_wide)+
-  geom_bar(aes(choice, fill=choice), color="black", show.legend = FALSE)+
-  theme_bw()
+mc_commute_wide <- mc_commute_wide |>  mutate(housing = case_when(shared != "No" ~ "shared", 
+                                                                  family != "No" ~ "family",
+                                                                  TRUE ~ "solo"),
+                                              housing = factor(housing))
+summary(mc_commute_wide$housing)
+```
+
+
+Se grafican los treemaps de todas las variables cualitativas.
+
+
+
+```{r}
+df_factor <- mc_commute_wide |> dplyr::select(where(is.factor))
+var_factor <- names(df_factor)
+
+for (vf in var_factor) {
+tabla <-   mc_commute_wide |> group_by(eval(as.name(vf))) |> summarize(n = n())  
+names(tabla) <- c(vf, "n")
+
+
+
+#print(tabla)
+figura <- ggplot(tabla) +
+  geom_treemap(aes(fill = eval(as.name(vf)), area = n)) +
+  labs(fill=vf)
+
+
+print(figura)  
+  
+}
+
 ```
 
 
 
+*Violin plots* de las ditribuciones de las variables numéricas respecto a `choice`. No todas son útiles.
+
+
+```{r}
+df_num <- mc_commute_wide |> dplyr::select(where(is.numeric))
+var_num <- names(df_num)
+
+for (vn in var_num) {
+figura <-  mc_commute_wide |>  ggplot(aes(x = choice, y = eval(as.name(vn)), fill = choice)) +
+  geom_violin(trim = TRUE) +
+  geom_boxplot(width = 0.1, fill = "white") + 
+  labs(x="Mode", y = vn, fill = "Mode") 
+
+
+print(figura)
+}
+
+
+```
+
+
+
+Tablas de contingencia por medio de *balloon plots*.
+
+```{r}
+
+for (vf in var_factor) {
+  tableau <- table(mc_commute_wide$choice,
+mc_commute_wide[[vf]])
+
+balloonplot(as.table(tableau),
+            xlab = "Mode", ylab = vf,
+            dotsize = 3/max(strwidth(19), strheight(19)),
+            dotcolor = "skyblue", text.size = 0.65,
+            main = paste("Mode as a function of ", vf, sep=""),
+            label = TRUE, label.size = 0.80,
+            # Scale balloons by volume (or diameter)
+            scale.method = c("volume"), scale.range = c("absolute"),
+            # Space for column/row labels
+            colmar = 1, rowmar = 2,
+            # Display zeros if present
+            show.zeros = TRUE,
+            # Display row and column sums
+            show.margins = TRUE,
+            # Display cumulative margins as cascade plots
+            cum.margins = TRUE)
+}
+
+      
+```
+
+
+*Alluvial plot*
 
 
 ```{r}
@@ -96,13 +215,9 @@ mc_commute_alluvia |>
 
 
 
-```{r}
-ggplot(mc_commute_wide)+
-  geom_point(aes(time.Cycle, time.Car, color=choice))+
-  xlim(0,20)+
-  ylim(0,25)+
-  theme_bw()
-```
+
+
+
 
 
 
