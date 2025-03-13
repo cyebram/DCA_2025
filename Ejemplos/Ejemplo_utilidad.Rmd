@@ -1,6 +1,6 @@
 ---
 title: "Ejemplo función de utilidad"
-date: "Febrero 2025"
+date: "Marzo 2025"
 output: 
   html_document:
     toc: true
@@ -35,32 +35,215 @@ library(pracma)
 Un inversionista tiene $\$1000$ para invertir en dos tipo de acciones. Si invierte $\$m$ en la acción $A$ invertirá $\$(1000-m)$ en la acción $B$.  Una inversión en la acción $A$ tiene una probabilidad de 0.7 de duplicar su valor y 0.3 de perder la inversión.  Una inversión en la acción $B$ tiene una probabilidad de 0.6 de duplicar su valor y 0.4 de perder la inversión.  Las probabilidades asociadas con la acción $A$ son independientes de las asociadas a la inversión $B$. Determinar el valor óptimo de $m$ si la función de utilidad del decisor para ganar o perder $x$ es $u(x)=log(x+3000)$.  
 
 
-Función utilidad
+## Función de utilidad
+
+```{r}
+u <- function(x){log(x+3000)}
+
+ggplot()+
+  geom_function(fun = u, xlim=c(0,30000), color="firebrick", linewidth=1.2)+
+  theme_bw()
 
 
-Vector de valores monetarios X
+```
+
+## Valores monetarios finales y sus probabilidades.
+
+* Se duplica la inversión en ambas acciones:
+
+\begin{equation}
+V_{f1}= 2m+2(1000-m)-1000=1000
+\end{equation}
+  
+  Probabilidad: $P_1=(0.7)(0.6)=0.42$
+  
+* Se duplica la inversión en la acción $A$ se pierde la inversión en la acción $B$:
+
+\begin{equation}
+V_{f2}= 2m-1000
+\end{equation}
+  
+  Probabilidad: $P_2=(0.7)(0.4)=0.28$
+
+* Se pierde la inversión en la acción $A$ se duplica la inversión en la acción $B$:
+
+\begin{equation}
+V_{f3}= 2(1000-m)-1000=1000-2m
+\end{equation}
+  
+  Probabilidad: $P_3=(0.3)(0.6)=0.18$
+  
+* Se pierde la inversión en ambas acciones:
+
+\begin{equation}
+V_{f4}= -1000
+\end{equation}
+  
+  Probabilidad: $P_4=(0.3)(0.4)=0.12$
 
 
-Vector de probabilidades
+## Vector de valores monetarios $X$ como función de $m$
+
+```{r}
+X <- function(m){c(1000, 2*m-1000, 1000-2*m, -1000)}
+```
+
+Por ejemplo para $m=500$
+
+```{r}
+X(500)
+```
+
+## Vector de probabilidades
+
+```{r}
+P <- c(0.42, 0.28, 0.18, 0.12)
+```
+
+
+## Valor monetario esperado como función de $m$
+
+```{r}
+Ex <- function(m){
+  sum(X(m)*P)
+}
+```
+
+
+Por ejemplo para $m=500$
+
+```{r}
+Ex(500)
+```
+
+## Utilidad esperada como función de $m$
+
+```{r}
+Eu <- function(m){
+  sum(u(X(m))*P)
+}
+
+EuVec <- Vectorize(Eu) # Versión "vectorizada"
+
+m_values <- seq(0, 1000, by=0.01)
+
+ggplot()+
+  geom_line(aes(m_values, EuVec(m_values)), color="dodgerblue", linewidth=1.2)+
+  theme_bw()
+
+```
+
+
+En esta versión numérica el máximo de la utilidad esperada es
+
+```{r}
+max(EuVec(m_values))
+```
+Que ocurre cuando 
+
+```{r}
+m_values[which(EuVec(m_values)==max(EuVec(m_values)))]
+```
 
 
 
-Valor monetario esperado
+Nótese que la expresión para esta función es:
 
+\begin{equation}
+E(u|p)(m)=u(1000)(0.42)+u(2m-1000)(0.28)+u(1000-2m)(0.18)+u(-1000)(0.12)
+\end{equation}
 
+Cuya derivada es:
 
-Utilidad esperada
+\begin{equation}
+E'(u|p)(m)=0.56 u'(2m-1000)-0.36u'(1000-2m)
+\end{equation}
+
+O bien
+
+\begin{equation}
+E'(u|p)(m)=\frac{0.56}{2m+2000}-\frac{0.36}{4000-2m}
+\end{equation}
+
+Se iguala a cero y se resuelve para encontrar el punto crítico $m_0=826.087$ (que es muy parecido al valor numérico obtenido previamente):
+
+```{r}
+m0 <- (0.56*4000-0.36*2000)/(0.36*2+0.56*2)
+m0
+```
+
+Donde la utilidad esperada es:
+
+```{r}
+Eumax <- Eu(m0)
+Eumax
+```
+
 
 
 Certidumbre equivalente
 
+Recordemos que la certidumbre equivalente $x_c$ es el valor monetario asignado a la lotería (en este caso los posibles resultados de las inversiones), en este caso:
+
+\begin{equation}
+x_c=u^{-1}(E(u(m_0)|p))=u^{-1}(8.09)
+\end{equation}
+
+es decir, encontrar $x_c$ tal que:
+
+\begin{equation}
+log(x_c+3000)=8.09\quad \Longrightarrow x_c=e^{8.089}-3000
+\end{equation}
+
+o bien
+
+```{r}
+xc <- exp(Eumax)-3000
+xc
+```
 
 
 
-Prima de riesgo
+## Prima de riesgo
+
+Recordemos que la prima de riesgo $\pi$ es la parte máxima del valor monetario esperado que se está dispuesto a perder a fin de evitar el riesgo asociado a la inversión, y está dada por:
+
+\begin{equation}
+\pi=E(x|p)-x_c
+\end{equation}
 
 
+En este caso es:
 
 
+```{r}
+prima <- Ex(m0)-xc
+prima
+```
 
+## Aversión al riesgo local.
+
+Recordemos que la función de riesgo total está definida por:
+
+\begin{equation}
+r(x)=-\frac{u''(x)}{u'(x)}
+\end{equation}
+
+En este caso es:
+
+\begin{equation}
+r(x)=\frac{1}{x+3000}
+\end{equation}
+
+Cuya gráfica es:
+
+```{r}
+rx <- function(x){1/(x+3000)}
+
+ggplot()+
+  geom_function(fun=rx, xlim=c(-1000, 1000), color="firebrick", linewidth=1.2)+
+  theme_bw()
+```
+
+La cual es positiva para todo valor final monetario de las inversiones. 
 
