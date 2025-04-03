@@ -1,0 +1,321 @@
+---
+title: "6. Behavioral Insights from Choice Models"
+format: html
+editor: visual
+---
+
+```{r}
+#| code-fold: true
+#| message: false
+#| warning: false
+
+
+library(knitr)
+library(tidyverse)
+library(discrtr) # A companion package for the book Introduction to Discrete Choice Analysis with `R`
+library(dplyr) # A Grammar of Data Manipulation
+library(ggplot2) # Create Elegant Data Visualisations Using the Grammar of Graphics
+library(mlogit) # Multinomial Logit Models
+library(readr) # Read Rectangular Text Data
+library(gplots) # Various R Programming Tools for Plotting Data
+library(ggmosaic) # Mosaic Plots in the 'ggplot2' Framework
+library(treemapify)
+library(ggridges)
+library(ggalluvial)
+library(kableExtra) # Construct Complex Table with kable and Pipe Syntax
+library(plotly) # Create interactive web graphics
+library(tidyr) # Tidy messy data
+#library(webshot2) # Take screenshots of web pages
+
+library(evd)
+```
+
+# Cargar el conjunto de datos `Heating`
+
+```{r}
+#| code-fold: true
+
+data("Heating")
+glimpse(Heating)
+```
+
+# EDA
+
+
+## Resúmenes estadísticos
+
+```{r}
+#| code-fold: true
+
+Proportion <- Heating %>% group_by(depvar) %>% summarise(no_rows = n())
+
+df <- data.frame(System = c("Gas Central", "Gas Room", "Electric Central", "Electric Room", "Heat Pump"),
+                 Installation = c(mean(Heating$ic.gc), mean(Heating$ic.gr),
+                                  mean(Heating$ic.ec), mean(Heating$ic.er),
+                                  median(Heating$ic.hp)),
+                 Operation = c(mean(Heating$oc.gc), mean(Heating$oc.gr),
+                               mean(Heating$oc.ec), mean(Heating$oc.er),
+                               mean(Heating$oc.hp)),
+                 Proportion = Proportion$no_rows/900)
+
+df %>% kable() %>% kable_styling()
+```
+
+
+
+```{r}
+#| code-fold: true
+
+Heating %>% select(13:16) %>% summary()
+```
+
+
+## Proporción de preferencias
+
+
+```{r}
+#| code-fold: true
+#| fig-align: 'center'
+
+my_colors <- c("gc"= "firebrick1", "gr" = "orange2" , "ec"= "dodgerblue3" , "er"= "darkcyan" , "hp"= "forestgreen")
+
+
+ggplot(Heating)+
+  geom_bar(aes(depvar, fill=depvar), show.legend=FALSE, color="black")+
+  scale_fill_manual(values= my_colors)+
+  labs(x="Alternativas", y="Frecuencia")+
+  theme_bw()+
+  theme(
+        axis.text.x=element_text(size=13),
+        axis.text.y=element_text(size=13),
+        axis.title.x = element_text(face="bold", size=14),
+        axis.title.y = element_text(face="bold", size=14)
+        )
+```
+
+
+
+## Costos por alternativa
+
+Antes cambiamos el conjunto de datos por longitud usando la función del package mlogit.
+
+```{r}
+#| code-fold: true
+
+H <- Heating %>% mlogit.data(shape = "wide", choice="depvar", varying=c(3:12))
+H_long <-  as_tibble(H)
+#glimpse(H_long)
+levels(H$alt) <- levels(Heating$depvar)
+levels(H_long$alt) <- levels(Heating$depvar)
+
+ggplot(H_long)+
+  geom_boxplot(aes(alt, ic, color=alt), show.legend = FALSE)+
+  scale_color_manual(values= my_colors)+
+  labs(x="Alternativas", y="Installation Cost")+
+  theme_bw()+
+  theme(
+        axis.text.x=element_text(size=13),
+        axis.text.y=element_text(size=13),
+        axis.title.x = element_text(face="bold", size=14),
+        axis.title.y = element_text(face="bold", size=14)
+        )
+
+```
+
+
+
+```{r}
+#| code-fold: true
+
+ggplot(H_long)+
+  geom_boxplot(aes(alt, oc, color=alt), show.legend = FALSE)+
+  scale_color_manual(values= my_colors)+
+  labs(x="Alternativas", y="Operation Cost")+
+  theme_bw()+
+  theme(
+        axis.text.x=element_text(size=13),
+        axis.text.y=element_text(size=13),
+        axis.title.x = element_text(face="bold", size=14),
+        axis.title.y = element_text(face="bold", size=14)
+        )
+```
+
+# Modelo Logit Multinomial 1
+
+
+\begin{eqnarray}
+V_{ec} &=& 0 &+& \beta_1\,ic.ec\\
+V_{er} &=& \mu_{er} &+& \beta_1\,ic.er\\
+V_{gc} &=& \mu_{gc} &+& \beta_1\,ic.gc\\
+V_{gr} &=& \mu_{gr} &+& \beta_1\,ic.gr\\
+V_{hp} &=& \mu_{hp} &+& \beta_1\,ic.hp
+\end{eqnarray}
+
+
+```{r}
+#| code-fold: true
+
+model1 <- mlogit(depvar~ ic, Heating, shape="wide", choice="depvar", reflevel = "ec", varying=c(3:7))
+summary(model1)
+```
+
+
+
+
+Alternativas con mayor probabilidad para cada persona:
+
+
+```{r}
+choice_pred <- apply(model1$probabilities, 1,function(x) names(x)[which(x==max(x))])
+
+Heating_pred <- Heating |> mutate(choice_pred=choice_pred, .before = 3)
+table(Heating_pred$depvar,Heating_pred$choice_pred)
+```
+
+# Efectos marginales
+
+
+Con el fin de calcular los efectos marginales se encuentran los costos de instalación mínimo, medio, máximo y se crean conjuntos de datos para aplicar el modelo 1.
+
+
+```{r}
+#| code-fold: true
+
+ic_min <- Heating[1, ]
+ic_mean <- Heating[1, ]
+ic_max <- Heating[1, ]
+
+min_cost <- Heating %>% select(starts_with("ic")) %>%
+                        summarise(across(.cols = everything(), min))
+
+mean_cost <- Heating %>% select(starts_with("ic")) %>%
+             summarise(across(.cols = everything(), mean))
+
+max_cost <- Heating %>% select(starts_with("ic")) %>%  
+                        summarise(across(.cols = everything(), max))
+
+ic_min[3:7] <- min_cost
+ic_mean[3:7] <- mean_cost
+ic_max[3:7] <- max_cost
+```
+
+
+
+
+Se aplica el modelo 1 para cada nivel de costo de instalación.
+
+```{r}
+#| code-fold: true
+
+p_model1_ic_min <- predict(model1, newdata = mlogit.data(ic_min, shape = "wide", choice = "depvar", varying = 3:7))
+
+p_model1_ic_mean <- predict(model1, newdata = mlogit.data(ic_mean, shape = "wide", choice = "depvar", varying = 3:7))
+
+p_model1_ic_max <- predict(model1, newdata = mlogit.data(ic_max, shape = "wide", choice = "depvar", varying = 3:7))
+```
+
+
+
+```{r}
+#| code-fold: true
+
+p_model1_ic_min
+
+p_model1_ic_mean
+
+p_model1_ic_max
+
+```
+
+
+
+Efecto marginal a nivel de costo mínimo
+
+```{r}
+#| code-fold: true
+
+effects(model1, covariate = "ic", type = "ra",
+        data = mlogit.data(ic_min, shape = "wide", choice = "depvar", varying = 3:7))
+```
+
+
+Efecto marginal a nivel de costo promedio
+
+```{r}
+#| code-fold: true
+
+effects(model1, covariate = "ic", type = "ra",
+        data = mlogit.data(ic_mean, shape = "wide", choice = "depvar", varying = 3:7))
+```
+
+
+
+Efecto marginal a nivel de costo máximo
+
+```{r}
+effects(model1, covariate = "ic", type = "ra",
+        data = mlogit.data(ic_max, shape = "wide", choice = "depvar", varying = 3:7))
+```
+
+
+
+
+
+Elasticidad a nivel de costo mínimo
+
+```{r}
+effects(model1, covariate = "ic", type = "rr",
+        data = mlogit.data(ic_min, shape = "wide", choice = "depvar", varying = 3:7))
+```
+
+
+
+Efecto marginal a nivel de costo promedio
+
+```{r}
+#| code-fold: true
+
+effects(model1, covariate = "ic", type = "ra",
+        data = mlogit.data(ic_mean, shape = "wide", choice = "depvar", varying = 3:7))
+```
+
+
+
+
+Elasticidad a nivel de costo máximo
+
+```{r}
+#| code-fold: true
+
+effects(model1, covariate = "ic", type = "rr",
+        data = mlogit.data(ic_max, shape = "wide", choice = "depvar", varying = 3:7))
+```
+
+
+
+# Modelo 2: Considerando la variable específica del decisor/a, region
+
+
+```{r}
+#| code-fold: true
+
+ggplot(Heating)+
+  geom_bar(aes(region, fill=region), color="black", show.legend = FALSE)+
+  theme_bw()
+
+```
+
+
+
+```{r}
+#| code-fold: true
+
+model2 <- mlogit(depvar ~ ic | region, Heating, shape = "wide", choice = "depvar", reflevel = "ec",
+                 varying = c(3:7))
+
+summary(model2)
+```
+
+
+
+
