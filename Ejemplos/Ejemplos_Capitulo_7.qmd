@@ -1,0 +1,348 @@
+---
+title: "7. Generalized Extreme Value Models"
+format: html
+editor: visual
+---
+
+```{r}
+#| code-fold: true
+#| message: false
+#| warning: false
+
+
+library(knitr)
+library(tidyverse)
+library(discrtr) # A companion package for the book Introduction to Discrete Choice Analysis with `R`
+library(dplyr) # A Grammar of Data Manipulation
+library(ggplot2) # Create Elegant Data Visualisations Using the Grammar of Graphics
+library(mlogit) # Multinomial Logit Models
+library(readr) # Read Rectangular Text Data
+library(gplots) # Various R Programming Tools for Plotting Data
+library(ggmosaic) # Mosaic Plots in the 'ggplot2' Framework
+library(treemapify)
+library(ggridges)
+library(ggalluvial)
+library(kableExtra) # Construct Complex Table with kable and Pipe Syntax
+library(plotly) # Create interactive web graphics
+library(tidyr) # Tidy messy data
+#library(webshot2) # Take screenshots of web pages
+
+library(evd)
+```
+
+# Cargar el conjunto de datos `Heating`.
+
+También se crea el conjunto por longitud análogo y se estima el modelo logit multinomial (Model3)
+
+
+```{r}
+#| code-fold: true
+
+data("Heating", package = "mlogit")
+H <- mlogit.data(Heating, shape = "wide", choice = "depvar", varying = c(3:12))
+model3 <- mlogit(depvar ~ ic + oc, Heating, shape = "wide", choice = "depvar", reflevel = "ec", varying = c(3:12))
+summary(model3)
+```
+
+# Patrones de sustitución
+
+Queremos explorar los patrones de sustitución al no considerar un sistema de calefacción a la vez, en lugar de seguir el procedimiento del libro podemos utilizar las utilidades sistemáticas que se calcularon en el modelo:
+
+```{r}
+#| code-fold: true
+
+Utilidades <- as.data.frame(model3$linpred)
+head(Utilidades)
+```
+
+
+Probabilidades sin ec.
+
+```{r}
+#| code-fold: true
+
+sin_ec <- Utilidades |> mutate(p_ec = NA, p_er = exp(er)/(exp(er) + exp(gc)+exp(gr)+ exp(hp)),
+                               p_gc = exp(gc)/(exp(er) + exp(gc)+exp(gr)+ exp(hp)),
+                               p_gr = exp(gr)/(exp(er) + exp(gc)+exp(gr)+ exp(hp)),
+                               p_hp = exp(hp)/(exp(er) + exp(gc)+exp(gr)+ exp(hp)))
+
+sin_ec <- sin_ec |> dplyr::select(p_ec:p_hp)
+
+head(sin_ec)
+
+```
+
+
+Probabilidades sin er.
+
+```{r}
+#| code-fold: true
+
+sin_er <- Utilidades |> mutate(p_ec = exp(ec)/(exp(ec) + exp(gc)+exp(gr)+ exp(hp)), p_er = NA,
+                               p_gc = exp(gc)/(exp(ec) + exp(gc)+exp(gr)+ exp(hp)),
+                               p_gr = exp(gr)/(exp(ec) + exp(gc)+exp(gr)+ exp(hp)),
+                               p_hp = exp(hp)/(exp(ec) + exp(gc)+exp(gr)+ exp(hp)))
+
+sin_er <- sin_er |> dplyr::select(p_ec:p_hp)
+
+head(sin_er)
+
+```
+
+
+Probabilidades sin gc.
+
+```{r}
+#| code-fold: true
+
+sin_gc <- Utilidades |> mutate(p_ec = exp(ec)/(exp(ec) + exp(er)+exp(gr)+ exp(hp)), 
+                               p_er = exp(er)/(exp(ec) + exp(er)+exp(gr)+ exp(hp)), p_gc = NA,
+                               p_gr = exp(gr)/(exp(ec) + exp(er)+exp(gr)+ exp(hp)),
+                               p_hp = exp(hp)/(exp(ec) + exp(er)+exp(gr)+ exp(hp)))
+
+sin_gc <- sin_gc |> dplyr::select(p_ec:p_hp)
+
+head(sin_gc)
+
+```
+
+Probabilidades sin gr.
+
+```{r}
+#| code-fold: true
+
+sin_gr <- Utilidades |> mutate(p_ec = exp(ec)/(exp(ec) + exp(er)+exp(gc)+ exp(hp)), 
+                               p_er = exp(er)/(exp(ec) + exp(er)+exp(gc)+ exp(hp)), 
+                               p_gc = exp(gr)/(exp(ec) + exp(er)+exp(gc)+ exp(hp)), p_gr = NA,
+                               p_hp = exp(hp)/(exp(ec) + exp(er)+exp(gc)+ exp(hp)))
+
+sin_gr <- sin_gr |> dplyr::select(p_ec:p_hp)
+
+head(sin_gr)
+
+```
+
+
+Probabilidades sin hp.
+
+```{r}
+#| code-fold: true
+
+sin_hp <- Utilidades |> mutate(p_ec = exp(ec)/(exp(ec) + exp(er)+exp(gc)+ exp(gr)), 
+                               p_er = exp(er)/(exp(ec) + exp(er)+exp(gc)+ exp(gr)), 
+                               p_gc = exp(gr)/(exp(ec) + exp(er)+exp(gc)+ exp(gr)), 
+                               p_gr = exp(hp)/(exp(ec) + exp(er)+exp(gc)+ exp(gr)),
+                               p_hp = NA)
+
+sin_hp <- sin_hp |> dplyr::select(p_ec:p_hp)
+
+head(sin_hp)
+
+```
+
+
+Creamos una tabla con el promedio de las probabilidades.
+
+```{r}
+#| code-fold: true
+
+probabilidades_model3 <- model3$probabilities
+prob_model3_promedio <- apply(probabilidades_model3, 2, mean)
+names(prob_model3_promedio) <- c("p_ec", "p_er", "p_gc", "p_gr", "p_hp")
+
+probabilidades_promedio <- data.frame(Alternativa = c("None", "ec", "er", "gc", "gr", "hp" ),
+rbind(prob_model3_promedio,
+apply(sin_ec, 2, mean),
+apply(sin_er, 2, mean),
+apply(sin_gc, 2, mean),
+apply(sin_gr, 2, mean),
+apply(sin_hp, 2, mean))
+)
+
+probabilidades_promedio <- tibble(probabilidades_promedio)
+probabilidades_promedio %>%
+kable(col.names = c("Alternative Removed",
+"ec",
+"er",
+"gc",
+"gr",
+"hp"),
+digits = 3) %>%
+kable_styling()
+```
+
+
+
+# Estimación del modelo logit anidado
+
+
+```{r}
+#| code-fold: true
+
+nl1 <- mlogit(depvar ~ oc + ic, H, nests = list(room=c('er', 'gr'), central = c('ec', 'gc', 'hp')), steptol=1e-12)
+
+summary(nl1)
+```
+
+
+Comparamos el modelo anidado 1 y el model3
+
+```{r}
+lrtest(model3, nl1)
+```
+
+Modelo anidado forzando que $\lambda_s$ sea el mismo para cada nido.
+
+
+```{r}
+#| code-fold: true
+nl2 <- mlogit(depvar ~ ic + oc, H, nests = list(room = c( 'er', 'gr'), central = c('ec', 'gc', 'hp')),
+              un.nest.el = TRUE, steptol = 1e-12)
+
+summary(nl2)
+```
+
+
+
+Comparación de los dos modelos anidados
+
+```{r}
+lrtest(nl2, nl1)
+```
+
+
+# Patrones de sustitución con el modelo logit anidado `nl2`
+
+```{r}
+#| code-fold: true
+
+Utilidades <- as.data.frame(nl2$linpred)
+head(Utilidades)
+```
+
+
+Probabilidades sin ec.
+
+```{r}
+#| code-fold: true
+
+
+lnest <- coef(nl2)["iv"]
+
+
+
+
+
+sin_ec <- Utilidades |> mutate(p_ec = NA, p_er = exp(er/lnest)* (exp(er/lnest)+exp(gr/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(gc/lnest)+ exp(hp/lnest))^lnest),
+                               p_gc = exp(gc/lnest)* (exp(gc/lnest)+exp(hp/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(gc/lnest)+ exp(hp/lnest))^lnest),
+                               p_gr = exp(gr/lnest)* (exp(er/lnest)+exp(gr/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(gc/lnest)+ exp(hp/lnest))^lnest),
+                               p_hp = exp(hp/lnest)* (exp(gc/lnest)+exp(hp/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(gc/lnest)+ exp(hp/lnest))^lnest))
+
+sin_ec <- sin_ec |> dplyr::select(p_ec:p_hp)
+
+head(sin_ec)
+
+```
+
+
+Probabilidades sin er.
+
+```{r}
+#| code-fold: true
+
+sin_er <- Utilidades |> mutate(p_ec = exp(ec/lnest)* (exp(gc/lnest)+exp(ec/lnest)+ exp(hp/lnest))^(lnest-1) /(exp(gr/lnest)^(lnest) + (exp(gc/lnest)+ exp(ec/lnest)+ exp(hp/lnest))^lnest), 
+                               
+                               p_er = NA,
+                               p_gc = exp(gc/lnest)* (exp(gc/lnest)+exp(ec/lnest)+ exp(hp/lnest))^(lnest-1) /(exp(gr/lnest)^(lnest) + (exp(gc/lnest)+ exp(ec/lnest)+ exp(hp/lnest))^lnest),
+                               p_gr = exp(gr) /(exp(gr/lnest)^(lnest) + (exp(gc/lnest)+ exp(ec/lnest)+ exp(hp/lnest))^lnest),
+                               p_hp = exp(hp/lnest)* (exp(gc/lnest)+exp(ec/lnest)+ exp(hp/lnest))^(lnest-1) /(exp(gr/lnest)^(lnest) + (exp(gc/lnest)+ exp(ec/lnest)+ exp(hp/lnest))^lnest))
+
+sin_er <- sin_er |> dplyr::select(p_ec:p_hp)
+
+head(sin_er)
+
+```
+
+
+Probabilidades sin gc.
+
+```{r}
+#| code-fold: true
+
+sin_gc <- Utilidades |> mutate(p_ec = exp(ec/lnest)* (exp(ec/lnest)+exp(hp/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(ec/lnest)+ exp(hp/lnest))^lnest), p_er = exp(er/lnest)* (exp(er/lnest)+exp(gr/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(ec/lnest)+ exp(hp/lnest))^lnest),
+                               p_gc = NA,
+                               p_gr = exp(gr/lnest)* (exp(er/lnest)+exp(gr/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(ec/lnest)+ exp(hp/lnest))^lnest),
+                               p_hp = exp(hp/lnest)* (exp(ec/lnest)+exp(hp/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(ec/lnest)+ exp(hp/lnest))^lnest))
+
+sin_gc <- sin_gc |> dplyr::select(p_ec:p_hp)
+
+head(sin_gc)
+
+```
+
+Probabilidades sin gr.
+
+```{r}
+#| code-fold: true
+
+sin_gr <- Utilidades |> mutate(p_ec = exp(ec/lnest)* (exp(gc/lnest)+exp(ec/lnest)+ exp(hp/lnest))^(lnest-1) /(exp(er/lnest)^(lnest) + (exp(gc/lnest)+ exp(ec/lnest)+ exp(hp/lnest))^lnest), 
+                               
+                               p_er = exp(er) /(exp(er/lnest)^(lnest) + (exp(gc/lnest)+ exp(ec/lnest)+ exp(hp/lnest))^lnest),,
+                               p_gc = exp(gc/lnest)* (exp(gc/lnest)+exp(ec/lnest)+ exp(hp/lnest))^(lnest-1) /(exp(er/lnest)^(lnest) + (exp(gc/lnest)+ exp(ec/lnest)+ exp(hp/lnest))^lnest),
+                               p_gr = NA,
+                               p_hp = exp(hp/lnest)* (exp(gc/lnest)+exp(ec/lnest)+ exp(hp/lnest))^(lnest-1) /(exp(er/lnest)^(lnest) + (exp(gc/lnest)+ exp(ec/lnest)+ exp(hp/lnest))^lnest))
+
+sin_gr <- sin_gr |> dplyr::select(p_ec:p_hp)
+
+head(sin_gr)
+
+```
+
+
+Probabilidades sin hp.
+
+```{r}
+#| code-fold: true
+
+sin_hp <- Utilidades |> mutate(p_ec = exp(ec/lnest)* (exp(ec/lnest)+exp(gc/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(ec/lnest)+ exp(gc/lnest))^lnest), p_er = exp(er/lnest)* (exp(er/lnest)+exp(gr/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(ec/lnest)+ exp(gc/lnest))^lnest),
+                               p_gc = exp(gc/lnest)* (exp(ec/lnest)+exp(gc/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(ec/lnest)+ exp(gc/lnest))^lnest),
+                               p_gr = exp(gr/lnest)* (exp(er/lnest)+exp(gr/lnest))^(lnest-1) /((exp(er/lnest)+exp(gr/lnest))^(lnest) + (exp(ec/lnest)+ exp(gc/lnest))^lnest),
+                               p_hp = NA)
+
+sin_hp <- sin_hp |> dplyr::select(p_ec:p_hp)
+
+head(sin_hp)
+
+```
+
+
+Creamos una tabla con el promedio de las probabilidades.
+
+```{r}
+#| code-fold: true
+
+probabilidades_nl2 <- nl2$probabilities
+prob_nl2_promedio <- apply(probabilidades_nl2, 2, mean)
+names(prob_nl2_promedio) <- c("p_ec", "p_er", "p_gc", "p_gr", "p_hp")
+
+probabilidades_promedio <- data.frame(Alternativa = c("None", "ec", "er", "gc", "gr", "hp" ),
+rbind(prob_nl2_promedio,
+apply(sin_ec, 2, mean),
+apply(sin_er, 2, mean),
+apply(sin_gc, 2, mean),
+apply(sin_gr, 2, mean),
+apply(sin_hp, 2, mean))
+)
+
+probabilidades_promedio <- tibble(probabilidades_promedio)
+probabilidades_promedio %>%
+kable(col.names = c("Alternative Removed",
+"ec",
+"er",
+"gc",
+"gr",
+"hp"),
+digits = 3) %>%
+kable_styling()
+```
+
