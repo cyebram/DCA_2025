@@ -12,3 +12,5 @@ Repositorio del curso de teoría de decisiones 2025
 * Tarea 4. Ejercicios del Capítulo 5 Practical Issues in the Specification and Estimation of Discrete Choice Models. Considerar como referencia las notas del respectivo capítulo.
 
 * Tarea 5. Ejercicios del Capítulo 6 Behavioral Insights from Choice Models. Considerar como referencia las notas del respectivo capítulo.
+
+* Tarea 6. Ejercicios 2, 3 y 4 del Capítulo 7 Non-proportional Substitution Patterns I: Generalized Extreme Value Models. Considerar como referencia las notas del respectivo capítulo.

@@ -1,0 +1,130 @@
+---
+title: "Ejercicio. Clases Latentes."
+format: 
+  html:
+    grid: 
+      body-width: 1300px
+editor: visual
+---
+
+```{r}
+#| code-fold: true
+#| message: false
+#| warning: false
+
+
+library(knitr)
+library(tidyverse)
+library(discrtr) # A companion package for the book Introduction to Discrete Choice Analysis with `R`
+library(dplyr) # A Grammar of Data Manipulation
+library(ggplot2) # Create Elegant Data Visualisations Using the Grammar of Graphics
+library(mlogit) # Multinomial Logit Models
+library(readr) # Read Rectangular Text Data
+library(gplots) # Various R Programming Tools for Plotting Data
+library(ggmosaic) # Mosaic Plots in the 'ggplot2' Framework
+library(treemapify)
+library(ggridges)
+library(ggalluvial)
+library(kableExtra) # Construct Complex Table with kable and Pipe Syntax
+library(plotly) # Create interactive web graphics
+library(tidyr) # Tidy messy data
+library(evd)
+
+# Para poder estimar el modelo de clases latentes, es necesario instalar la versión de desarrollo, 
+# pero antes hay que instalr el package remotes
+#install.packages("remotes")
+#remotes::install_github("mauricio1986/gmnl")
+library(gmnl)
+library(AER)
+```
+
+
+
+
+Estimar un modelo clases lantentes con los datos `TravelMode` del package `AER`.
+
+
+## Cargar los datos
+
+Se sugiere consultar la documentación`TravelMode`
+
+```{r}
+#| code-fold: true
+
+data("TravelMode", package="AER")
+glimpse(TravelMode)
+```
+
+
+## EDA
+
+Se filtran los datos de elección (choice == yes)
+
+```{r}
+TravelMode_choice <- TravelMode |> filter(choice == "yes")
+```
+
+Tabla de elección (frecuencias)
+
+```{r}
+#| code-fold: true
+
+table(TravelMode_choice$mode)
+```
+Proporción
+
+```{r}
+#| code-fold: true
+
+table(TravelMode_choice$mode)/nrow(TravelMode_choice)
+```
+
+
+
+### Elección (gráfica de barras)
+
+```{r}
+#| code-fold: true
+#| fig-align: 'center'
+
+ggplot(TravelMode_choice)+
+  geom_bar(aes(mode, fill=mode), color="black", show.legend = FALSE)+
+  theme_bw()
+
+```
+
+## *Treemap* de `choice`
+
+
+```{r}
+#| code-fold: true
+#| fig-align: 'center'
+
+TravelMode_choice |> group_by(mode) |> summarize(n = n()) |> 
+ggplot() +
+  geom_treemap(aes(fill = mode, area = n), color="black") +
+  labs(title = "Trips by mode", fill="Mode")
+```
+
+
+## Modelos Logit Multinomial
+
+```{r}
+TravelMode <- TravelMode |> mutate(id = as.integer(individual))
+TravelMode_logit <- mlogit.data(TravelMode, choice = "choice", shape = "long", alt.var = "mode",  id.var = "id", chid.var = "individual")
+```
+
+
+## Modelos de clases latentes
+
+
+
+
+
+
+
+
+
+
+
+
